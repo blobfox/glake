@@ -10,6 +10,7 @@ import lustre
 import lustre/attribute
 import lustre/effect.{type Effect}
 import lustre/element
+import lustre/event
 import lustre/element/html
 
 import lustre_websocket as ws
@@ -31,6 +32,10 @@ pub type Model {
 
 pub type Msg {
   WsWrapper(ws.WebSocketEvent)
+  Up 
+  Left
+  Down
+  Right
 }
 
 fn init(_flags) -> #(Model, Effect(Msg)) {
@@ -59,6 +64,11 @@ pub fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     WsWrapper(ws.OnTextMessage(msg)) -> #(Model(..model, field: parse_field(msg)), effect.none())
     WsWrapper(ws.OnBinaryMessage(_msg)) -> todo as "either-or"
     WsWrapper(ws.OnClose(_reason)) -> #(Model(..model, ws: None), effect.none())
+    
+    Up -> todo
+    Left -> todo
+    Down -> todo
+    Right -> todo
   }
 }
 
@@ -84,8 +94,8 @@ pub fn cell(model: Model, row: Int, column: Int) -> element.Element(Msg) {
   html.div(classes, [])
 }
 
-pub fn view(model: Model) -> element.Element(Msg) {
-  html.div([attribute.id("app")], 
+pub fn field(model: Model) -> element.Element(Msg) {
+  html.div([attribute.id("field")], 
     range(from: 0, to: second(size) - 1)
     |> flat_map(fn(row) {
       range(from: 0, to: first(size) - 1)
@@ -95,6 +105,25 @@ pub fn view(model: Model) -> element.Element(Msg) {
       |> append(iterator.from_list([html.br([])]))
     })
     |> to_list()
+  )
+}
+
+pub fn controls(model: Model) -> element.Element(Msg) {
+  html.div([attribute.id("controls")], [
+    html.button([attribute.class("up"), event.on_click(Up)], [element.text("⇧")]),
+    html.button([attribute.class("left"), event.on_click(Left)], [element.text("⇦")]),
+    html.button([attribute.class("down"), event.on_click(Down)], [element.text("⇩")]),
+    html.button([attribute.class("right"), event.on_click(Right)], [element.text("⇨")]),
+  ])
+}
+
+pub fn view(model: Model) -> element.Element(Msg) {
+  html.div([attribute.id("app")],
+    [
+      html.h1([], [element.text("Hello World")]),
+      field(model),
+      controls(model)
+    ]
   )
 }
 

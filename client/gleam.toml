@@ -1,4 +1,4 @@
-name = "glake-client"
+name = "glakeclient"
 target = "javascript"
 version = "1.0.0"
 

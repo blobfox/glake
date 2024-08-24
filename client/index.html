@@ -8,9 +8,9 @@
 
     <!-- Uncomment this if you add the TailwindCSS integration -->
     <!-- <link rel="stylesheet" href="/priv/static/gleamsnake.css"> -->
-    <script type="module" src="/priv/static/gleamsnake.mjs"></script>
+    <script type="module" src="/priv/static/glakeclient.mjs"></script>
     <style>
-      #app {
+      #field {
         line-height: 0;
       }
       .cell {
@@ -31,6 +31,32 @@
       .cell.green {
         background-color: green;
       }
+
+      #controls {
+        position: relative;
+      }
+      #controls button {
+        font-size: 40px;
+        position: absolute;
+      }
+
+      #controls .up {
+        top: 0;
+        left: 60px;
+      }
+      #controls .left {
+        top: 60px;
+        left: 0;
+      }
+      #controls .down {
+        top: 60px;
+        left: 60px;
+      }
+      #controls .right {
+        top: 60px;
+        left: 120px;
+      }
+      
     </style>
   </head>
 
