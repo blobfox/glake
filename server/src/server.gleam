@@ -3,13 +3,10 @@ import gleam/http
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/io
-import gleam/option
+import gleam/option.{type Option}
 import gleam/otp/actor
 import gleam/string_builder
-import mist.{
-  type Connection, type ResponseData, type WebsocketConnection,
-  type WebsocketMessage,
-}
+import mist.{type ResponseData, type WebsocketConnection, type WebsocketMessage}
 import mist/internal/http as mist_http
 import wisp
 import wisp/wisp_mist
@@ -37,7 +34,7 @@ fn mist_router(
   wisp_router: fn(Request(wisp.Connection)) -> wisp.Response,
   secret_key: String,
 ) -> fn(Request(mist_http.Connection)) -> Response(ResponseData) {
-  fn(request: Request(Connection)) -> Response(ResponseData) {
+  fn(request: Request(mist.Connection)) -> Response(ResponseData) {
     case request.path_segments(request) {
       ["ws"] -> websocket_view(request)
       _ -> wisp_mist.handler(wisp_router, secret_key)(request)
@@ -116,7 +113,7 @@ fn websocket_controller(
 
 fn on_init(
   _connection: WebsocketConnection,
-) -> #(Nil, option.Option(process.Selector(message))) {
+) -> #(Nil, Option(process.Selector(message))) {
   let selector = process.new_selector()
   let state = Nil
 
