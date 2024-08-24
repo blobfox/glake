@@ -5,7 +5,6 @@ import gleam/http/response
 import gleam/io
 import gleam/option
 import gleam/otp/actor
-import gleam/result
 import gleam/string_builder
 import mist
 import mist/internal/http as mist_http
@@ -24,7 +23,7 @@ fn start_webserver(webserver_port port: Int) {
     mist_router(router, secret_key_base)
     |> mist.new
     |> mist.port(port)
-    |> mist.start_http()
+    |> mist.start_http
 
   process.sleep_forever()
 }

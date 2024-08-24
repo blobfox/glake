@@ -35,6 +35,7 @@ common = { path = "../common" }
 gleam = { version = ">= 0.1.0 and < 1.0.0" }
 gleam_erlang = { version = ">= 0.25.0 and < 1.0.0" }
 gleam_http = { version = ">= 3.6.0 and < 4.0.0" }
+gleam_otp = { version = ">= 0.11.2 and < 1.0.0" }
 gleam_stdlib = { version = ">= 0.34.0 and < 2.0.0" }
 gleeunit = { version = ">= 1.0.0 and < 2.0.0" }
 mist = { version = ">= 2.0.0 and < 3.0.0" }
