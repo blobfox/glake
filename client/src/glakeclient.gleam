@@ -13,6 +13,9 @@ import lustre/element
 import lustre/event
 import lustre/element/html
 
+import plinth/browser/document
+import plinth/browser/event as dom_event
+
 import lustre_websocket as ws
 
 import gleam/json
@@ -36,10 +39,33 @@ pub type Msg {
   Left
   Down
   Right
+  Nop
+}
+
+pub fn key_to_msg(key: String) -> Msg {
+  case key {
+    "ArrowUp" -> Up
+    "ArrowLeft" -> Left
+    "ArrowDown" -> Down
+    "ArrowRight" -> Right
+    _ -> Nop
+  }
+}
+
+fn global_events(dispatch: fn(Msg) -> Nil) -> Nil {
+  document.add_event_listener("keydown", fn(event: dom_event.Event) -> Nil {
+    event |> dom_event.key |> key_to_msg |> dispatch
+  })
 }
 
 fn init(_flags) -> #(Model, Effect(Msg)) {
-  #(Model(dict.from_list([]), None), ws.init("ws://localhost:8080/", WsWrapper))
+  #(
+    Model(dict.from_list([]), None), 
+    effect.batch([
+      ws.init("ws://localhost:8080/", WsWrapper),
+      effect.from(global_events),
+    ])
+  )
 }
 
 pub fn parse_field(input: String) -> Field {
@@ -88,6 +114,7 @@ pub fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     WsWrapper(ws.OnClose(_reason)) -> #(Model(..model, ws: None), effect.none())
     
     Up | Left | Down | Right -> #(model, send_update(model, msg))
+    Nop -> #(model, effect.none())
   }
 }
 
@@ -137,7 +164,9 @@ pub fn controls() -> element.Element(Msg) {
 }
 
 pub fn view(model: Model) -> element.Element(Msg) {
-  html.div([attribute.id("app")],
+  html.div([
+      attribute.id("app"),
+    ],
     [
       html.h1([], [element.text("Hello World")]),
       field(model),
