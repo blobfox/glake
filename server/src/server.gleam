@@ -1,8 +1,10 @@
-import gleam/erlang/process
+import gleam/erlang/process.{type Subject}
+import gleam/function
 import gleam/http
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/io
+import gleam/list
 import gleam/option.{type Option}
 import gleam/otp/actor
 import gleam/string_builder
@@ -18,9 +20,10 @@ pub fn main() {
 fn start_webserver(webserver_port port: Int) {
   wisp.configure_logger()
   let secret_key_base = wisp.random_string(64)
+  let assert Ok(broadcaster) = actor.start([], broadcast_handle_message)
 
   let assert Ok(_) =
-    mist_router(router, secret_key_base)
+    mist_router(router, broadcaster, secret_key_base)
     |> mist.new
     |> mist.port(port)
     |> mist.start_http
@@ -32,11 +35,12 @@ fn start_webserver(webserver_port port: Int) {
 
 fn mist_router(
   wisp_router: fn(Request(wisp.Connection)) -> wisp.Response,
+  broadcaster: Subject(BroadcastMessage(Message)),
   secret_key: String,
 ) -> fn(Request(mist_http.Connection)) -> Response(ResponseData) {
   fn(request: Request(mist.Connection)) -> Response(ResponseData) {
     case request.path_segments(request) {
-      ["ws"] -> websocket_view(request)
+      ["ws"] -> websocket_view(request, broadcaster)
       _ -> wisp_mist.handler(wisp_router, secret_key)(request)
     }
   }
@@ -71,7 +75,15 @@ fn home_view(request: wisp.Request) -> wisp.Response {
   }
 }
 
-fn websocket_view(request: Request(mist.Connection)) -> Response(ResponseData) {
+fn websocket_view(
+  request: Request(mist.Connection),
+  broadcaster: Subject(BroadcastMessage(Message)),
+) -> Response(ResponseData) {
+  let on_init = on_init(_, broadcaster)
+  let websocket_controller = fn(state, connection, message) {
+    websocket_controller(state, connection, message, broadcaster)
+  }
+
   mist.websocket(
     request: request,
     on_init: on_init,
@@ -91,18 +103,19 @@ fn home_controller(_request: wisp.Request) -> wisp.Response {
 fn websocket_controller(
   state,
   connection: WebsocketConnection,
-  message: WebsocketMessage(message),
+  message: WebsocketMessage(Message),
+  broadcaster: Subject(BroadcastMessage(Message)),
 ) {
   case message {
     mist.Text(text) -> {
-      let assert Ok(_) = mist.send_text_frame(connection, text)
+      process.send(broadcaster, Broadcast(Send(text)))
       actor.continue(state)
     }
     mist.Text(_) | mist.Binary(_) -> {
       actor.continue(state)
     }
-    mist.Custom(_) -> {
-      let assert Ok(_) = mist.send_text_frame(connection, "Hi")
+    mist.Custom(Send(text)) -> {
+      let assert Ok(_) = mist.send_text_frame(connection, text)
       actor.continue(state)
     }
     mist.Closed | mist.Shutdown -> actor.Stop(process.Normal)
@@ -111,15 +124,59 @@ fn websocket_controller(
 
 // Websocket utils ------------------------------------
 
-fn on_init(
-  _connection: WebsocketConnection,
-) -> #(Nil, Option(process.Selector(message))) {
-  let selector = process.new_selector()
-  let state = Nil
+type BroadcastMessage(a) {
+  Register(subject: Subject(a))
+  Unregister(subject: Subject(a))
+  Broadcast(msg: a)
+}
 
-  #(state, option.Some(selector))
+type SocketState {
+  SocketState(subject: Subject(Message))
+}
+
+type Message {
+  Send(String)
+}
+
+fn broadcast_handle_message(
+  message: BroadcastMessage(a),
+  destionations: List(process.Subject(a)),
+) {
+  case message {
+    Register(subject) -> actor.continue([subject, ..destionations])
+    Unregister(subject) ->
+      actor.continue(
+        destionations |> list.filter(fn(destination) { destination != subject }),
+      )
+    Broadcast(inner) -> {
+      destionations
+      |> list.each(fn(dest) { process.send(dest, inner) })
+      actor.continue(destionations)
+    }
+  }
+}
+
+fn on_init(
+  connection: WebsocketConnection,
+  broadcaster: Subject(BroadcastMessage(Message)),
+) -> #(SocketState, Option(process.Selector(Message))) {
+  let subject = process.new_subject()
+  let selector =
+    process.new_selector()
+    |> process.selecting(subject, function.identity)
+
+  process.send(broadcaster, Register(subject))
+  io.debug(connection)
+  #(SocketState(subject), option.Some(selector))
 }
 
 fn on_close(_state) {
   io.print("connection closed")
+}
+
+// Game -------------------------------------------------------
+
+fn game_loop(broadcaster: Subject(BroadcastMessage(Message))) {
+  process.send(broadcaster, Broadcast(Send("Test")))
+  game_loop(broadcaster)
 }
