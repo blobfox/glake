@@ -1,12 +1,15 @@
 import gleam/erlang/process
 import gleam/http
-import gleam/http/request
-import gleam/http/response
+import gleam/http/request.{type Request}
+import gleam/http/response.{type Response}
 import gleam/io
 import gleam/option
 import gleam/otp/actor
 import gleam/string_builder
-import mist
+import mist.{
+  type Connection, type ResponseData, type WebsocketConnection,
+  type WebsocketMessage,
+}
 import mist/internal/http as mist_http
 import wisp
 import wisp/wisp_mist
@@ -31,13 +34,10 @@ fn start_webserver(webserver_port port: Int) {
 // Router ------------------------------------------
 
 fn mist_router(
-  wisp_router: fn(request.Request(wisp.Connection)) -> wisp.Response,
+  wisp_router: fn(Request(wisp.Connection)) -> wisp.Response,
   secret_key: String,
-) -> fn(request.Request(mist_http.Connection)) ->
-  response.Response(mist.ResponseData) {
-  fn(request: request.Request(mist.Connection)) -> response.Response(
-    mist.ResponseData,
-  ) {
+) -> fn(Request(mist_http.Connection)) -> Response(ResponseData) {
+  fn(request: Request(Connection)) -> Response(ResponseData) {
     case request.path_segments(request) {
       ["ws"] -> websocket_view(request)
       _ -> wisp_mist.handler(wisp_router, secret_key)(request)
@@ -74,9 +74,7 @@ fn home_view(request: wisp.Request) -> wisp.Response {
   }
 }
 
-fn websocket_view(
-  request: request.Request(mist.Connection),
-) -> response.Response(mist.ResponseData) {
+fn websocket_view(request: Request(mist.Connection)) -> Response(ResponseData) {
   mist.websocket(
     request: request,
     on_init: on_init,
@@ -95,8 +93,8 @@ fn home_controller(_request: wisp.Request) -> wisp.Response {
 
 fn websocket_controller(
   state,
-  connection: mist.WebsocketConnection,
-  message: mist.WebsocketMessage(message),
+  connection: WebsocketConnection,
+  message: WebsocketMessage(message),
 ) {
   case message {
     mist.Text(text) -> {
@@ -117,7 +115,7 @@ fn websocket_controller(
 // Websocket utils ------------------------------------
 
 fn on_init(
-  connection: mist.WebsocketConnection,
+  _connection: WebsocketConnection,
 ) -> #(Nil, option.Option(process.Selector(message))) {
   let selector = process.new_selector()
   let state = Nil
@@ -125,6 +123,6 @@ fn on_init(
   #(state, option.Some(selector))
 }
 
-fn on_close(state) {
+fn on_close(_state) {
   io.print("connection closed")
 }
