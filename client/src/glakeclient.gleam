@@ -1,7 +1,7 @@
 import gleam/dict.{type Dict, filter}
 import gleam/iterator.{range, map, to_list, flat_map, append}
 import gleam/pair.{first, second}
-import gleam/result.{unwrap}
+import gleam/result
 import gleam/list.{contains}
 import gleam/option.{type Option, None, Some}
 
@@ -54,7 +54,29 @@ pub fn parse_field(input: String) -> Field {
   )
 
   json.decode(input, using: field_decoder)
-  |> unwrap(dict.from_list([]))
+  |> result.unwrap(dict.from_list([]))
+}
+
+pub fn from_msg_to_direction(msg: Msg) -> String {
+  case msg {
+    Up -> "up"
+    Left -> "left"
+    Down -> "down"
+    Right -> "right"
+    _ -> panic
+  }
+}
+
+pub fn send_update(model: Model, msg: Msg) -> Effect(Msg) {
+  model.ws
+  |> option.map(fn (socket: ws.WebSocket) -> Effect(Msg) {
+    json.object([
+      #("direction", msg |> from_msg_to_direction |> json.string),
+    ])
+    |> json.to_string
+    |> ws.send(socket, _)
+  })
+  |> option.unwrap(effect.none())
 }
 
 pub fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
@@ -65,10 +87,7 @@ pub fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     WsWrapper(ws.OnBinaryMessage(_msg)) -> todo as "either-or"
     WsWrapper(ws.OnClose(_reason)) -> #(Model(..model, ws: None), effect.none())
     
-    Up -> todo
-    Left -> todo
-    Down -> todo
-    Right -> todo
+    Up | Left | Down | Right -> #(model, send_update(model, msg))
   }
 }
 
@@ -87,7 +106,7 @@ pub fn cell(model: Model, row: Int, column: Int) -> element.Element(Msg) {
   let classes = 
     get_color(model, row, column)
     |> result.map(fn(color) { [color] })
-    |> unwrap([])
+    |> result.unwrap([])
     |> list.append([base_class])
     |> list.map(attribute.class)
 
@@ -108,7 +127,7 @@ pub fn field(model: Model) -> element.Element(Msg) {
   )
 }
 
-pub fn controls(model: Model) -> element.Element(Msg) {
+pub fn controls() -> element.Element(Msg) {
   html.div([attribute.id("controls")], [
     html.button([attribute.class("up"), event.on_click(Up)], [element.text("⇧")]),
     html.button([attribute.class("left"), event.on_click(Left)], [element.text("⇦")]),
@@ -122,7 +141,7 @@ pub fn view(model: Model) -> element.Element(Msg) {
     [
       html.h1([], [element.text("Hello World")]),
       field(model),
-      controls(model)
+      controls()
     ]
   )
 }
