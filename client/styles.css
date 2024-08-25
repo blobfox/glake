@@ -1,0 +1,113 @@
+* {
+    color: #fefefc;
+    font-family: sans-serif;
+}
+
+body {
+    background-color: #292d3e;
+}
+
+#app {
+    margin-left: 30px;
+}
+
+h1 {
+    font-size: 40px;
+    margin-bottom: 30px;
+    margin-top: 30px;
+}
+
+p {
+    font-size: 18px;
+}
+
+#field {
+    line-height: 0;
+    width: 800px;
+    flex-shrink: 0;
+}
+
+.cell {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    background-color: #584355;
+    box-sizing: border-box;
+    margin: 1px;
+    padding: 0;
+    position: relative;
+}
+
+.cell.orange {
+    background-color: #FCBEA7;
+}
+
+.cell.blue {
+    background-color: #A6F0FC;
+}
+
+.cell.green {
+    background-color: #A7FCCE;
+}
+
+.cell.pink {
+    background-color: #ffaff3;
+}
+
+.cell.purple {
+    background-color: #CBA7FC;
+}
+
+.cell.fruit::after {
+    content: '';
+    background-color: #E5FCA2;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    border-radius: 5px;
+    transform: translate(-50%, -50%);
+}
+
+#columns {
+    display: flex;
+}
+
+#infobox {
+    flex-grow: 1;
+    padding: 30px;
+}
+
+#controls {
+    position: relative;
+    margin-top: 40px;
+    margin-left: calc(50% - 80px);
+}
+
+#controls button {
+    font-size: 40px;
+    position: absolute;
+    background-color: #fefefc;
+    color: #1e1e1e;
+}
+
+#controls .up {
+    top: 0;
+    left: 60px;
+}
+
+#controls .left {
+    top: 60px;
+    left: 0;
+}
+
+#controls .down {
+    top: 60px;
+    left: 60px;
+}
+
+#controls .right {
+    top: 60px;
+    left: 120px;
+}
