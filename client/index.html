@@ -3,90 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-    <title>🚧 gleamsnake</title>
-
-    <!-- Uncomment this if you add the TailwindCSS integration -->
-    <!-- <link rel="stylesheet" href="/priv/static/gleamsnake.css"> -->
+    <title>Glake</title>
     <script type="module" src="/priv/static/client.mjs"></script>
-    <style>
-      * {
-        color: #fefefc;
-      }
-      body {
-        background-color: #292d3e;
-      }
-      #field {
-        line-height: 0;
-      }
-      .cell {
-        display: inline-block;
-        width: 14px;
-        height: 14px;
-        background-color: #584355;
-        box-sizing: border-box;
-        margin: 1px;
-        padding: 0;
-        position: relative;
-      }
-      .cell.orange {
-        background-color: #FCBEA7;
-      }
-      .cell.blue {
-        background-color: #A6F0FC;
-      }
-      .cell.green {
-        background-color: #A7FCCE;
-      }
-      .cell.pink {
-        background-color: #ffaff3;
-      }
-      .cell.purple {
-        background-color: #CBA7FC;
-      }
-
-      .cell.fruit::after {
-        content: '';
-        background-color: #E5FCA2;
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 10px;
-        height: 10px;
-        border-radius: 5px;
-        transform: translate(-50%, -50%);
-      }
-
-      #controls {
-        position: relative;
-      }
-      #controls button {
-        font-size: 40px;
-        position: absolute;
-        background-color: #fefefc;
-        color: #1e1e1e;
-      }
-
-      #controls .up {
-        top: 0;
-        left: 60px;
-      }
-      #controls .left {
-        top: 60px;
-        left: 0;
-      }
-      #controls .down {
-        top: 60px;
-        left: 60px;
-      }
-      #controls .right {
-        top: 60px;
-        left: 120px;
-      }
-      
-    </style>
+    <link rel="stylesheet" type="text/css" href="styles.css">
   </head>
-
   <body>
     <div id="app"></div>
   </body>

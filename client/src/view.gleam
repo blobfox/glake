@@ -64,9 +64,20 @@ pub fn view(model: Model) -> element.Element(Msg) {
       attribute.id("app"),
     ],
     [
-      html.h1([], [element.text("Hello World")]),
-      field(model),
-      controls()
+      html.h1([], [element.text("Glake")]),
+      html.div([
+        attribute.id("columns")
+      ], [
+        field(model),
+        html.div([
+            attribute.id("infobox")
+        ], [
+            html.p([], [
+                element.text("Use the arrow keys on your keyboard, or use the buttons below to control your glake."),
+            ]),
+            controls()
+        ])
+      ])
     ]
   )
 }
