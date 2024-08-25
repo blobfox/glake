@@ -1,6 +1,5 @@
-import gleam/dict.{type Dict, filter}
+import gleam/dict.{filter}
 import gleam/iterator.{range, map, to_list, flat_map, append}
-import gleam/pair.{first, second}
 import gleam/result
 import gleam/list.{contains}
 import gleam/option.{type Option, None, Some}
@@ -18,13 +17,8 @@ import plinth/browser/event as dom_event
 
 import lustre_websocket as ws
 
-import gleam/json
-import gleam/dynamic
+import common.{type WsPlayerAction, player_action_to_json, type Field, json_to_field, field_size, type Color, color_to_string}
 
-
-const size = #(50, 30)
-
-pub type Field = Dict(String, List(#(Int, Int)))
 
 pub type Model {
   Model(
@@ -52,6 +46,16 @@ pub fn key_to_msg(key: String) -> Msg {
   }
 }
 
+fn msg_to_player_action(msg: Msg) -> WsPlayerAction {
+  case msg {
+    Up -> common.Up
+    Left -> common.Left
+    Down -> common.Down
+    Right -> common.Right
+    _ -> common.Nop
+  }
+}
+
 fn global_events(dispatch: fn(Msg) -> Nil) -> Nil {
   document.add_event_listener("keydown", fn(event: dom_event.Event) -> Nil {
     event |> dom_event.key |> key_to_msg |> dispatch
@@ -68,38 +72,12 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
   )
 }
 
-pub fn parse_field(input: String) -> Field {
-  let field_decoder = dynamic.dict(
-    dynamic.string,
-    dynamic.list(
-      dynamic.tuple2(
-        dynamic.int,
-        dynamic.int,
-      )
-    )
-  )
-
-  json.decode(input, using: field_decoder)
-  |> result.unwrap(dict.from_list([]))
-}
-
-pub fn from_msg_to_direction(msg: Msg) -> String {
-  case msg {
-    Up -> "up"
-    Left -> "left"
-    Down -> "down"
-    Right -> "right"
-    _ -> panic
-  }
-}
-
 pub fn send_update(model: Model, msg: Msg) -> Effect(Msg) {
   model.ws
   |> option.map(fn (socket: ws.WebSocket) -> Effect(Msg) {
-    json.object([
-      #("direction", msg |> from_msg_to_direction |> json.string),
-    ])
-    |> json.to_string
+    msg
+    |> msg_to_player_action
+    |> player_action_to_json
     |> ws.send(socket, _)
   })
   |> option.unwrap(effect.none())
@@ -109,7 +87,7 @@ pub fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   case msg {
     WsWrapper(ws.InvalidUrl) -> panic
     WsWrapper(ws.OnOpen(socket)) -> #(Model(..model, ws: Some(socket)), ws.send(socket, "client-init"))
-    WsWrapper(ws.OnTextMessage(msg)) -> #(Model(..model, field: parse_field(msg)), effect.none())
+    WsWrapper(ws.OnTextMessage(msg)) -> #(Model(..model, field: json_to_field(msg)), effect.none())
     WsWrapper(ws.OnBinaryMessage(_msg)) -> todo as "either-or"
     WsWrapper(ws.OnClose(_reason)) -> #(Model(..model, ws: None), effect.none())
     
@@ -118,13 +96,13 @@ pub fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   }
 }
 
-pub fn get_color(model: Model, row: Int, column: Int) -> Result(String, Nil) {
+pub fn get_color(model: Model, row: Int, column: Int) -> Result(Color, Nil) {
   model.field
   |> filter(fn(_, value) {
     value |> contains(#(column, row))
   })
   |> dict.to_list
-  |> list.map(fn(tuple) { first(tuple) })
+  |> list.map(fn(tuple) { tuple.0 })
   |> list.first
 }
 
@@ -132,6 +110,7 @@ pub fn cell(model: Model, row: Int, column: Int) -> element.Element(Msg) {
   let base_class = "cell"
   let classes = 
     get_color(model, row, column)
+    |> result.map(color_to_string)
     |> result.map(fn(color) { [color] })
     |> result.unwrap([])
     |> list.append([base_class])
@@ -142,9 +121,9 @@ pub fn cell(model: Model, row: Int, column: Int) -> element.Element(Msg) {
 
 pub fn field(model: Model) -> element.Element(Msg) {
   html.div([attribute.id("field")], 
-    range(from: 0, to: second(size) - 1)
+    range(from: 0, to: field_size.1 - 1)
     |> flat_map(fn(row) {
-      range(from: 0, to: first(size) - 1)
+      range(from: 0, to: field_size.0 - 1)
       |> map(fn(column) {
         cell(model, row, column)
       })
