@@ -39,7 +39,7 @@ fn start_webserver(webserver_port port: Int) {
 
 fn mist_router(
   wisp_router: fn(Request(wisp.Connection)) -> wisp.Response,
-  broadcaster: Subject(GameMessage(Message)),
+  broadcaster: GameLoopSubject,
   secret_key: String,
 ) -> fn(Request(mist_http.Connection)) -> Response(ResponseData) {
   fn(request: Request(mist.Connection)) -> Response(ResponseData) {
@@ -81,7 +81,7 @@ fn home_view(request: wisp.Request) -> wisp.Response {
 
 fn websocket_view(
   request: Request(mist.Connection),
-  broadcaster: Subject(GameMessage(Message)),
+  broadcaster: GameLoopSubject,
 ) -> Response(ResponseData) {
   let on_init = on_init(_, broadcaster)
   let websocket_controller = fn(state, connection, message) {
@@ -108,11 +108,11 @@ fn websocket_controller(
   state: SocketState,
   connection: WebsocketConnection,
   message: WebsocketMessage(Message),
-  game: Subject(GameMessage(Message)),
+  game: GameLoopSubject,
 ) -> actor.Next(a, SocketState) {
   case message {
     mist.Text(text) -> {
-      process.send(game, Broadcast(Send(text)))
+      process.send(game, Broadcast(text))
       actor.continue(state)
     }
     mist.Text(_) | mist.Binary(_) -> {
@@ -128,24 +128,27 @@ fn websocket_controller(
 
 // Websocket utils ------------------------------------
 
-type GameMessage(a) {
-  Register(subject: Subject(a))
-  Unregister(subject: Subject(a))
-  Broadcast(a)
+type ClientSubject = Subject(Message)
+type GameLoopSubject = Subject(GameMessage)
+
+type GameMessage {
+  Register(subject: ClientSubject)
+  Unregister(subject: ClientSubject)
+  Broadcast(text: String)
   Tick
 }
 
 type SocketState {
-  SocketState(subject: Subject(Message))
+  SocketState(subject: ClientSubject)
 }
 
 type Message {
   Send(String)
 }
 
-type Glake(a) {
+type Glake {
   Glake(
-    subject: Subject(a),
+    subject: ClientSubject,
     color: Color,
     direction: Direction,
     position: List(List(Int)),
@@ -153,10 +156,10 @@ type Glake(a) {
 }
 
 type GameState(a) {
-  GameState(glakes: List(Glake(a)), fruites: List(List(Int)))
+  GameState(glakes: List(Glake), fruites: List(List(Int)))
 }
 
-fn game_message_handler(message: GameMessage(a), state: GameState(a)) {
+fn game_message_handler(message: GameMessage, state: GameState(a)) {
   case message {
     // TODO: On Register the color should be dynamic added
     // TODO: If the game is full == every color is used, the WS Connection shoud be closed
@@ -171,9 +174,9 @@ fn game_message_handler(message: GameMessage(a), state: GameState(a)) {
       |> GameState(state.fruites)
       |> actor.continue
     }
-    Broadcast(inner) -> {
+    Broadcast(text) -> {
       state.glakes
-      |> list.each(fn(glake) { process.send(glake.subject, inner) })
+      |> list.each(fn(glake) { process.send(glake.subject, Send(text)) })
       actor.continue(state)
     }
     Tick -> {
@@ -184,7 +187,7 @@ fn game_message_handler(message: GameMessage(a), state: GameState(a)) {
 
 fn on_init(
   connection: WebsocketConnection,
-  broadcaster: Subject(GameMessage(Message)),
+  broadcaster: GameLoopSubject
 ) -> #(SocketState, Option(process.Selector(Message))) {
   let subject = process.new_subject()
   let selector =
@@ -243,7 +246,7 @@ fn color_to_string(color: Color) -> String {
   }
 }
 
-fn field_to_json(glakes: List(Glake(a))) -> String {
+fn field_to_json(glakes: List(Glake)) -> String {
   list.map(glakes, fn(g) {
     #(
       color_to_string(g.color),
@@ -254,7 +257,7 @@ fn field_to_json(glakes: List(Glake(a))) -> String {
   |> json.to_string
 }
 
-fn ticker(broadcaster: Subject(GameMessage(Message))) {
+fn ticker(broadcaster: GameLoopSubject) {
   process.sleep(1000)
   process.send(broadcaster, Tick)
   // TODO: 
