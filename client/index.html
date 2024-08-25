@@ -27,6 +27,7 @@
         box-sizing: border-box;
         margin: 1px;
         padding: 0;
+        position: relative;
       }
       .cell.orange {
         background-color: #FCBEA7;
@@ -42,6 +43,18 @@
       }
       .cell.purple {
         background-color: #CBA7FC;
+      }
+
+      .cell.fruit::after {
+        content: '';
+        background-color: #E5FCA2;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 10px;
+        height: 10px;
+        border-radius: 5px;
+        transform: translate(-50%, -50%);
       }
 
       #controls {
