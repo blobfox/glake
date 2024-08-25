@@ -10,6 +10,12 @@
     <!-- <link rel="stylesheet" href="/priv/static/gleamsnake.css"> -->
     <script type="module" src="/priv/static/glakeclient.mjs"></script>
     <style>
+      * {
+        color: #fefefc;
+      }
+      body {
+        background-color: #292d3e;
+      }
       #field {
         line-height: 0;
       }
@@ -17,19 +23,25 @@
         display: inline-block;
         width: 14px;
         height: 14px;
-        background-color: pink;
+        background-color: #584355;
         box-sizing: border-box;
         margin: 1px;
         padding: 0;
       }
-      .cell.red {
-        background-color: red;
+      .cell.orange {
+        background-color: #FCBEA7;
       }
       .cell.blue {
-        background-color: blue;
+        background-color: #A6F0FC;
       }
       .cell.green {
-        background-color: green;
+        background-color: #A7FCCE;
+      }
+      .cell.pink {
+        background-color: #ffaff3;
+      }
+      .cell.purple {
+        background-color: #CBA7FC;
       }
 
       #controls {
@@ -38,6 +50,8 @@
       #controls button {
         font-size: 40px;
         position: absolute;
+        background-color: #fefefc;
+        color: #1e1e1e;
       }
 
       #controls .up {
