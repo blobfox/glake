@@ -1,4 +1,7 @@
-import common.{type Color, type WsPlayerAction as Direction}
+import common.{
+  type Color, type WsPlayerAction as Direction, Down, Left, Nop, Right, Up,
+  field_size,
+}
 import gleam/erlang/process.{type Subject}
 import gleam/function
 import gleam/http
@@ -8,6 +11,7 @@ import gleam/json
 import gleam/list
 import gleam/option.{type Option}
 import gleam/otp/actor
+import gleam/result
 import gleam/set
 import gleam/string_builder
 import mist.{type ResponseData, type WebsocketConnection, type WebsocketMessage}
@@ -138,7 +142,6 @@ type GameLoopSubject =
 type GameMessage {
   Register(subject: ClientSubject)
   Unregister(subject: ClientSubject)
-  Broadcast
   Tick
 }
 
@@ -155,19 +158,19 @@ type Glake {
     subject: ClientSubject,
     color: Color,
     direction: Direction,
-    position: List(List(Int)),
+    position: List(#(Int, Int)),
   )
 }
 
-type GameState(a) {
-  GameState(glakes: List(Glake), fruites: List(List(Int)))
+type GameState {
+  GameState(glakes: List(Glake), fruites: List(#(Int, Int)))
 }
 
 const colors = [
   common.Pink, common.Blue, common.Orange, common.Green, common.Purple,
 ]
 
-fn pick_free_color(state: GameState(a)) -> List(Color) {
+fn pick_free_color(state: GameState) -> List(Color) {
   // TODO: there is a list.contains function
   let used_colors =
     state.glakes |> list.map(fn(glake) { glake.color }) |> set.from_list
@@ -175,7 +178,7 @@ fn pick_free_color(state: GameState(a)) -> List(Color) {
   colors |> set.from_list |> set.difference(used_colors) |> set.to_list
 }
 
-fn game_message_handler(message: GameMessage, state: GameState(a)) {
+fn game_message_handler(message: GameMessage, state: GameState) {
   case message {
     // TODO: On Register the color should be dynamic added
     // TODO: If the game is full == every color is used, the WS Connection shoud be closed
@@ -186,7 +189,7 @@ fn game_message_handler(message: GameMessage, state: GameState(a)) {
         Ok(color) -> {
           // HACK: using list.append is ugly here
           list.append(state.glakes, [
-            Glake(subject, color, common.Right, [[0, 0]]),
+            Glake(subject, color, common.Right, [#(0, 0)]),
           ])
           |> GameState(state.fruites)
           |> actor.continue
@@ -200,14 +203,11 @@ fn game_message_handler(message: GameMessage, state: GameState(a)) {
       |> GameState(state.fruites)
       |> actor.continue
     }
-    Broadcast -> {
+    Tick -> {
       state.glakes
       |> list.each(fn(glake) {
         process.send(glake.subject, Send(field_to_json(state.glakes)))
       })
-      actor.continue(state)
-    }
-    Tick -> {
       state |> calculate_board |> actor.continue
     }
   }
@@ -230,12 +230,27 @@ fn on_close(state: SocketState, broadcaster: GameLoopSubject) {
   process.send(broadcaster, Unregister(state.subject))
 }
 
-fn calculate_board(state: GameState(a)) -> GameState(a) {
-  todo
+fn calculate_board(state: GameState) -> GameState {
+  GameState(
+    glakes: state.glakes |> list.map(caluclate_glake_movement),
+    fruites: state.fruites,
+  )
 }
 
 fn caluclate_glake_movement(glake: Glake) -> Glake {
-  todo
+  let old_head = glake.position |> list.last |> result.unwrap(#(0, 0))
+  let new_head = case glake.direction {
+    Up -> #(old_head.0, { old_head.1 - 1 + field_size.1 } % field_size.1)
+    Left -> #({ old_head.0 - 1 + field_size.0 } % field_size.0, old_head.1)
+    Down -> #(old_head.0, { old_head.1 + 1 } % field_size.1)
+    Right -> #({ old_head.0 + 1 } % field_size.0, old_head.1)
+    Nop -> panic
+  }
+
+  Glake(
+    ..glake,
+    position: glake.position |> list.append([new_head]) |> list.drop(1),
+  )
 }
 
 // Game -------------------------------------------------------
@@ -244,7 +259,9 @@ fn field_to_json(glakes: List(Glake)) -> String {
   list.map(glakes, fn(g) {
     #(
       common.color_to_string(g.color),
-      json.array(g.position, of: json.array(_, of: json.int)),
+      json.array(g.position, fn(position: #(Int, Int)) {
+        json.array([position.0, position.1], json.int)
+      }),
     )
   })
   |> json.object()
@@ -253,6 +270,6 @@ fn field_to_json(glakes: List(Glake)) -> String {
 
 fn ticker(broadcaster: GameLoopSubject) {
   process.sleep(1000)
-  process.send(broadcaster, Broadcast)
+  process.send(broadcaster, Tick)
   ticker(broadcaster)
 }
