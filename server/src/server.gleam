@@ -9,6 +9,7 @@ import gleam/http
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/int
+import gleam/iterator
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
@@ -209,9 +210,7 @@ fn game_message_handler(message: GameMessage, state: GameState) {
           process.send(subject, SetColor(color))
 
           // HACK: using list.append is ugly here
-          list.append(state.glakes, [
-            Glake(subject, color, common.Right, [#(0, 0)]),
-          ])
+          list.append(state.glakes, [spawn_glake(state, subject, color)])
           |> GameState(state.fruites)
           |> actor.continue
         }
@@ -290,13 +289,182 @@ fn calculate_board(state: GameState) -> GameState {
       fruites: calculate_eaten_fruites(state_with_moves),
     )
 
-  let state_with_new_fruits =
+  let state_with_collisions =
     GameState(
       ..state_with_scores,
-      fruites: state_with_scores |> calculate_fruits,
+      glakes: state_with_scores.glakes
+        |> list.map(calculate_collisions(_, state_with_scores)),
+    )
+
+  let state_with_new_fruits =
+    GameState(
+      ..state_with_collisions,
+      fruites: state_with_collisions |> calculate_fruits,
     )
 
   state_with_new_fruits
+}
+
+fn find_spawn_position(state: GameState) -> #(Int, Int) {
+  iterator.from_list([Nil])
+  |> iterator.cycle
+  |> iterator.map(fn(_) -> #(Int, Int) {
+    #(int.random(field_size.0), int.random(field_size.1))
+  })
+  |> iterator.drop_while(fn(position: #(Int, Int)) {
+    let position_that_need_to_be_free = [
+      #(
+        { position.0 - 2 + field_size.0 } % field_size.0,
+        { position.1 - 2 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 - 1 + field_size.0 } % field_size.0,
+        { position.1 - 2 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 + 0 + field_size.0 } % field_size.0,
+        { position.1 - 2 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 + 1 + field_size.0 } % field_size.0,
+        { position.1 - 2 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 + 2 + field_size.0 } % field_size.0,
+        { position.1 - 2 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 - 2 + field_size.0 } % field_size.0,
+        { position.1 - 1 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 - 1 + field_size.0 } % field_size.0,
+        { position.1 - 1 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 + 0 + field_size.0 } % field_size.0,
+        { position.1 - 1 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 + 1 + field_size.0 } % field_size.0,
+        { position.1 - 1 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 + 2 + field_size.0 } % field_size.0,
+        { position.1 - 1 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 - 2 + field_size.0 } % field_size.0,
+        { position.1 + 0 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 - 1 + field_size.0 } % field_size.0,
+        { position.1 + 0 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 + 0 + field_size.0 } % field_size.0,
+        { position.1 + 0 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 + 1 + field_size.0 } % field_size.0,
+        { position.1 + 0 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 + 2 + field_size.0 } % field_size.0,
+        { position.1 + 0 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 - 2 + field_size.0 } % field_size.0,
+        { position.1 + 1 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 - 1 + field_size.0 } % field_size.0,
+        { position.1 + 1 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 + 0 + field_size.0 } % field_size.0,
+        { position.1 + 1 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 + 1 + field_size.0 } % field_size.0,
+        { position.1 + 1 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 + 2 + field_size.0 } % field_size.0,
+        { position.1 + 1 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 - 2 + field_size.0 } % field_size.0,
+        { position.1 + 2 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 - 1 + field_size.0 } % field_size.0,
+        { position.1 + 2 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 + 0 + field_size.0 } % field_size.0,
+        { position.1 + 2 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 + 1 + field_size.0 } % field_size.0,
+        { position.1 + 2 + field_size.1 } % field_size.1,
+      ),
+      #(
+        { position.0 + 2 + field_size.0 } % field_size.0,
+        { position.1 + 2 + field_size.1 } % field_size.1,
+      ),
+    ]
+
+    position_that_need_to_be_free
+    |> list.any(fn(position_to_check: #(Int, Int)) {
+      {
+        state.glakes
+        |> list.any(fn(glake: Glake) {
+          glake.position
+          |> list.contains(position_to_check)
+        })
+      }
+      || {
+        state.fruites
+        |> list.contains(position_to_check)
+      }
+    })
+  })
+  |> iterator.first
+  |> result.unwrap(#(0, 0))
+  // shouldn't happen
+}
+
+const directions = [Up, Left, Down, Right]
+
+fn spawn_glake(
+  state: GameState,
+  subject: Subject(Message),
+  color: Color,
+) -> Glake {
+  let spawn_position = find_spawn_position(state)
+
+  let direction =
+    directions
+    |> list.drop(int.random(4))
+    |> list.first
+    |> result.unwrap(Right)
+
+  let spawn_offset = case direction {
+    Up -> #(0, 1)
+    Left -> #(1, 0)
+    Down -> #(0, -1)
+    Right -> #(-1, 0)
+    Nop -> panic
+  }
+
+  Glake(subject: subject, color: color, direction: direction, position: [
+    #(
+      { spawn_position.0 + spawn_offset.0 + field_size.0 } % field_size.0,
+      { spawn_position.1 + spawn_offset.1 + field_size.1 } % field_size.1,
+    ),
+    spawn_position,
+  ])
 }
 
 fn get_head(glake: Glake) -> #(Int, Int) {
@@ -304,6 +472,28 @@ fn get_head(glake: Glake) -> #(Int, Int) {
   |> list.last
   |> result.unwrap(#(0, 0))
   // this will never happen but we need a default
+}
+
+fn calculate_collisions(glake: Glake, state: GameState) -> Glake {
+  // todo
+  let head = glake |> get_head
+  let has_collision_with_other_glake =
+    state.glakes
+    |> list.filter(fn(other_glake: Glake) { glake.color != other_glake.color })
+    |> list.any(fn(other_glake: Glake) {
+      other_glake.position
+      |> list.contains(head)
+    })
+  let has_collusion_with_self =
+    glake.position
+    |> list.reverse
+    |> list.drop(1)
+    |> list.contains(head)
+
+  case has_collision_with_other_glake || has_collusion_with_self {
+    True -> spawn_glake(state, glake.subject, glake.color)
+    _ -> glake
+  }
 }
 
 fn calculate_eaten_fruites(state: GameState) -> List(#(Int, Int)) {
