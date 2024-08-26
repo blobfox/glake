@@ -3,7 +3,6 @@ import gleam/function
 import gleam/http
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
-import gleam/io
 import gleam/json
 import gleam/list
 import gleam/option.{type Option}
@@ -84,6 +83,7 @@ fn websocket_view(
   broadcaster: GameLoopSubject,
 ) -> Response(ResponseData) {
   let on_init = on_init(_, broadcaster)
+  let on_close = on_close(_, broadcaster)
   let websocket_controller = fn(state, connection, message) {
     websocket_controller(state, connection, message, broadcaster)
   }
@@ -128,8 +128,11 @@ fn websocket_controller(
 
 // Websocket utils ------------------------------------
 
-type ClientSubject = Subject(Message)
-type GameLoopSubject = Subject(GameMessage)
+type ClientSubject =
+  Subject(Message)
+
+type GameLoopSubject =
+  Subject(GameMessage)
 
 type GameMessage {
   Register(subject: ClientSubject)
@@ -174,9 +177,11 @@ fn game_message_handler(message: GameMessage, state: GameState(a)) {
       |> GameState(state.fruites)
       |> actor.continue
     }
-    Broadcast(text) -> {
+    Broadcast(_text) -> {
       state.glakes
-      |> list.each(fn(glake) { process.send(glake.subject, Send(text)) })
+      |> list.each(fn(glake) {
+        process.send(glake.subject, Send(field_to_json(state.glakes)))
+      })
       actor.continue(state)
     }
     Tick -> {
@@ -186,8 +191,8 @@ fn game_message_handler(message: GameMessage, state: GameState(a)) {
 }
 
 fn on_init(
-  connection: WebsocketConnection,
-  broadcaster: GameLoopSubject
+  _connection: WebsocketConnection,
+  broadcaster: GameLoopSubject,
 ) -> #(SocketState, Option(process.Selector(Message))) {
   let subject = process.new_subject()
   let selector =
@@ -195,13 +200,11 @@ fn on_init(
     |> process.selecting(subject, function.identity)
 
   process.send(broadcaster, Register(subject))
-  io.debug(connection)
   #(SocketState(subject), option.Some(selector))
 }
 
-fn on_close(state) {
-  io.debug(state)
-  io.print("connection closed\n")
+fn on_close(state: SocketState, broadcaster: GameLoopSubject) {
+  process.send(broadcaster, Unregister(state.subject))
 }
 
 // Game -------------------------------------------------------
@@ -261,6 +264,6 @@ fn ticker(broadcaster: GameLoopSubject) {
   process.sleep(1000)
   process.send(broadcaster, Tick)
   // TODO: 
-  // process.send(broadcaster, Broadcast)
+  process.send(broadcaster, Broadcast("right"))
   ticker(broadcaster)
 }
