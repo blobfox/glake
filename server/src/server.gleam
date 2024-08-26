@@ -226,7 +226,7 @@ fn game_message_handler(message: GameMessage, state: GameState) {
     PlayerAction(color, direction) -> {
       state.glakes
       |> list.map(fn(glake: Glake) -> Glake {
-        case glake.color == color {
+        case glake.color == color && direction != Nop {
           True -> Glake(..glake, direction: direction)
           _ -> glake
         }
@@ -235,11 +235,12 @@ fn game_message_handler(message: GameMessage, state: GameState) {
       |> actor.continue
     }
     Tick -> {
-      state.glakes
+      let next_state = state |> calculate_board
+      next_state.glakes
       |> list.each(fn(glake) {
-        process.send(glake.subject, Send(field_to_json(state.glakes)))
+        process.send(glake.subject, Send(field_to_json(next_state.glakes)))
       })
-      state |> calculate_board |> actor.continue
+      next_state |> actor.continue
     }
   }
 }
@@ -300,7 +301,7 @@ fn field_to_json(glakes: List(Glake)) -> String {
 }
 
 fn ticker(broadcaster: GameLoopSubject) {
-  process.sleep(1000)
+  process.sleep(300)
   process.send(broadcaster, Tick)
   ticker(broadcaster)
 }
