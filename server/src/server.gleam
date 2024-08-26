@@ -1,6 +1,6 @@
 import common.{
   type Color, type WsPlayerAction as Direction, Down, Left, Nop, Right, Up,
-  field_size,
+  field_size, json_to_player_action,
 }
 import gleam/erlang/process.{type Subject}
 import gleam/function
@@ -9,7 +9,7 @@ import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/json
 import gleam/list
-import gleam/option.{type Option}
+import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
 import gleam/result
 import gleam/set
@@ -115,9 +115,18 @@ fn websocket_controller(
   connection: WebsocketConnection,
   message: WebsocketMessage(Message),
   _game: GameLoopSubject,
-) -> actor.Next(a, SocketState) {
+) -> actor.Next(Message, SocketState) {
   case message {
-    mist.Text(_text) -> {
+    mist.Text(text) -> {
+      case state.color {
+        Some(color) ->
+          text
+          |> json_to_player_action
+          |> PlayerAction(color, _)
+          |> process.send(state.broadcaster, _)
+        None -> Nil
+      }
+
       actor.continue(state)
     }
     mist.Text(_) | mist.Binary(_) -> {
@@ -126,6 +135,9 @@ fn websocket_controller(
     mist.Custom(Send(text)) -> {
       let assert Ok(_) = mist.send_text_frame(connection, text)
       actor.continue(state)
+    }
+    mist.Custom(SetColor(color)) -> {
+      actor.continue(SocketState(..state, color: Some(color)))
     }
     mist.Closed | mist.Shutdown -> actor.Stop(process.Normal)
   }
@@ -142,15 +154,21 @@ type GameLoopSubject =
 type GameMessage {
   Register(subject: ClientSubject)
   Unregister(subject: ClientSubject)
+  PlayerAction(color: Color, direction: Direction)
   Tick
 }
 
 type SocketState {
-  SocketState(subject: ClientSubject)
+  SocketState(
+    color: Option(Color),
+    broadcaster: GameLoopSubject,
+    subject: ClientSubject,
+  )
 }
 
 type Message {
   Send(String)
+  SetColor(Color)
 }
 
 type Glake {
@@ -187,6 +205,8 @@ fn game_message_handler(message: GameMessage, state: GameState) {
 
       case color {
         Ok(color) -> {
+          process.send(subject, SetColor(color))
+
           // HACK: using list.append is ugly here
           list.append(state.glakes, [
             Glake(subject, color, common.Right, [#(0, 0)]),
@@ -200,6 +220,17 @@ fn game_message_handler(message: GameMessage, state: GameState) {
     }
     Unregister(subject) -> {
       list.filter(state.glakes, fn(glake) { glake.subject != subject })
+      |> GameState(state.fruites)
+      |> actor.continue
+    }
+    PlayerAction(color, direction) -> {
+      state.glakes
+      |> list.map(fn(glake: Glake) -> Glake {
+        case glake.color == color {
+          True -> Glake(..glake, direction: direction)
+          _ -> glake
+        }
+      })
       |> GameState(state.fruites)
       |> actor.continue
     }
@@ -223,7 +254,7 @@ fn on_init(
     |> process.selecting(subject, function.identity)
 
   process.send(broadcaster, Register(subject))
-  #(SocketState(subject), option.Some(selector))
+  #(SocketState(None, broadcaster, subject), option.Some(selector))
 }
 
 fn on_close(state: SocketState, broadcaster: GameLoopSubject) {
