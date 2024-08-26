@@ -1,5 +1,4 @@
 import gleam/json
-
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type DecodeError, DecodeError}
 import gleam/list
@@ -7,7 +6,6 @@ import gleam/result
 
 pub type Color {
   Fruit
-
   Pink
   Blue
   Orange
@@ -18,7 +16,6 @@ pub type Color {
 pub fn color_to_string(color: Color) -> String {
   case color {
     Fruit -> "fruit"
-
     Pink -> "pink"
     Blue -> "blue"
     Orange -> "orange"
@@ -30,7 +27,6 @@ pub fn color_to_string(color: Color) -> String {
 pub fn string_to_color(color: String) -> Result(Color, List(DecodeError)) {
   case color {
     "fruit" -> Ok(Fruit)
-
     "pink" -> Ok(Pink)
     "blue" -> Ok(Blue)
     "orange" -> Ok(Orange)
