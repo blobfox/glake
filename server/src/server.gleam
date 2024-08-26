@@ -9,8 +9,6 @@ import gleam/http
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/int
-import gleam/io
-import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
@@ -279,10 +277,51 @@ fn make_field(state: GameState) -> Field {
 }
 
 fn calculate_board(state: GameState) -> GameState {
-  GameState(
-    glakes: state.glakes |> list.map(caluclate_glake_movement),
-    fruites: calculate_fruits(state),
-  )
+  let state_with_moves =
+    GameState(
+      ..state,
+      glakes: state.glakes |> list.map(caluclate_glake_movement),
+    )
+
+  let state_with_scores =
+    GameState(
+      glakes: state_with_moves.glakes
+        |> list.map(calculate_glake_length(_, state_with_moves)),
+      fruites: calculate_eaten_fruites(state_with_moves),
+    )
+
+  let state_with_new_fruits =
+    GameState(
+      ..state_with_scores,
+      fruites: state_with_scores |> calculate_fruits,
+    )
+
+  state_with_new_fruits
+}
+
+fn get_head(glake: Glake) -> #(Int, Int) {
+  glake.position
+  |> list.last
+  |> result.unwrap(#(0, 0))
+  // this will never happen but we need a default
+}
+
+fn calculate_eaten_fruites(state: GameState) -> List(#(Int, Int)) {
+  state.fruites
+  |> list.filter(fn(fruit: #(Int, Int)) {
+    !{
+      state.glakes
+      |> list.map(get_head)
+      |> list.contains(fruit)
+    }
+  })
+}
+
+fn calculate_glake_length(glake: Glake, state: GameState) -> Glake {
+  case state.fruites |> list.contains(glake |> get_head) {
+    True -> glake
+    _ -> Glake(..glake, position: glake.position |> list.drop(1))
+  }
 }
 
 const target_fruits = 5
@@ -306,7 +345,7 @@ fn calculate_fruits(state: GameState) -> List(#(Int, Int)) {
 }
 
 fn caluclate_glake_movement(glake: Glake) -> Glake {
-  let old_head = glake.position |> list.last |> result.unwrap(#(0, 0))
+  let old_head = glake |> get_head
   let new_head = case glake.direction {
     Up -> #(old_head.0, { old_head.1 - 1 + field_size.1 } % field_size.1)
     Left -> #({ old_head.0 - 1 + field_size.0 } % field_size.0, old_head.1)
@@ -315,10 +354,7 @@ fn caluclate_glake_movement(glake: Glake) -> Glake {
     Nop -> panic
   }
 
-  Glake(
-    ..glake,
-    position: glake.position |> list.append([new_head]) |> list.drop(1),
-  )
+  Glake(..glake, position: glake.position |> list.append([new_head]))
 }
 
 fn ticker(broadcaster: GameLoopSubject) {
