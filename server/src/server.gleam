@@ -168,6 +168,7 @@ const colors = [
 ]
 
 fn pick_free_color(state: GameState(a)) -> List(Color) {
+  // TODO: there is a list.contains function
   let used_colors =
     state.glakes |> list.map(fn(glake) { glake.color }) |> set.from_list
 
@@ -190,6 +191,7 @@ fn game_message_handler(message: GameMessage, state: GameState(a)) {
           |> GameState(state.fruites)
           |> actor.continue
         }
+        // TODO: Handle this Error
         Error(_) -> todo
       }
     }
@@ -206,7 +208,7 @@ fn game_message_handler(message: GameMessage, state: GameState(a)) {
       actor.continue(state)
     }
     Tick -> {
-      actor.continue(state)
+      state |> calculate_board |> actor.continue
     }
   }
 }
@@ -226,6 +228,14 @@ fn on_init(
 
 fn on_close(state: SocketState, broadcaster: GameLoopSubject) {
   process.send(broadcaster, Unregister(state.subject))
+}
+
+fn calculate_board(state: GameState(a)) -> GameState(a) {
+  todo
+}
+
+fn caluclate_glake_movement(glake: Glake) -> Glake {
+  todo
 }
 
 // Game -------------------------------------------------------
