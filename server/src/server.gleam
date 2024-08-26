@@ -1,3 +1,4 @@
+import common.{type Color, type WsPlayerAction as Direction}
 import gleam/erlang/process.{type Subject}
 import gleam/function
 import gleam/http
@@ -7,6 +8,7 @@ import gleam/json
 import gleam/list
 import gleam/option.{type Option}
 import gleam/otp/actor
+import gleam/set
 import gleam/string_builder
 import mist.{type ResponseData, type WebsocketConnection, type WebsocketMessage}
 import mist/internal/http as mist_http
@@ -108,11 +110,10 @@ fn websocket_controller(
   state: SocketState,
   connection: WebsocketConnection,
   message: WebsocketMessage(Message),
-  game: GameLoopSubject,
+  _game: GameLoopSubject,
 ) -> actor.Next(a, SocketState) {
   case message {
-    mist.Text(text) -> {
-      process.send(game, Broadcast(text))
+    mist.Text(_text) -> {
       actor.continue(state)
     }
     mist.Text(_) | mist.Binary(_) -> {
@@ -137,7 +138,7 @@ type GameLoopSubject =
 type GameMessage {
   Register(subject: ClientSubject)
   Unregister(subject: ClientSubject)
-  Broadcast(text: String)
+  Broadcast
   Tick
 }
 
@@ -162,22 +163,42 @@ type GameState(a) {
   GameState(glakes: List(Glake), fruites: List(List(Int)))
 }
 
+const colors = [
+  common.Pink, common.Blue, common.Orange, common.Green, common.Purple,
+]
+
+fn pick_free_color(state: GameState(a)) -> List(Color) {
+  let used_colors =
+    state.glakes |> list.map(fn(glake) { glake.color }) |> set.from_list
+
+  colors |> set.from_list |> set.difference(used_colors) |> set.to_list
+}
+
 fn game_message_handler(message: GameMessage, state: GameState(a)) {
   case message {
     // TODO: On Register the color should be dynamic added
     // TODO: If the game is full == every color is used, the WS Connection shoud be closed
     Register(subject) -> {
-      // HACK: using list.append is ugly here
-      list.append(state.glakes, [Glake(subject, Pink, Right, [[0, 0]])])
-      |> GameState(state.fruites)
-      |> actor.continue
+      let color = pick_free_color(state) |> list.first
+
+      case color {
+        Ok(color) -> {
+          // HACK: using list.append is ugly here
+          list.append(state.glakes, [
+            Glake(subject, color, common.Right, [[0, 0]]),
+          ])
+          |> GameState(state.fruites)
+          |> actor.continue
+        }
+        Error(_) -> todo
+      }
     }
     Unregister(subject) -> {
       list.filter(state.glakes, fn(glake) { glake.subject != subject })
       |> GameState(state.fruites)
       |> actor.continue
     }
-    Broadcast(_text) -> {
+    Broadcast -> {
       state.glakes
       |> list.each(fn(glake) {
         process.send(glake.subject, Send(field_to_json(state.glakes)))
@@ -209,50 +230,10 @@ fn on_close(state: SocketState, broadcaster: GameLoopSubject) {
 
 // Game -------------------------------------------------------
 
-type Direction {
-  Up
-  Down
-  Left
-  Right
-}
-
-fn direction_to_string(direction: Direction) -> String {
-  case direction {
-    Up -> "up"
-    Down -> "down"
-    Left -> "left"
-    Right -> "right"
-  }
-}
-
-type Color {
-  Pink
-  White
-  Blue
-  Yellow
-  Aubergine
-  DarkBlue
-  Charcoal
-  Black
-}
-
-fn color_to_string(color: Color) -> String {
-  case color {
-    Pink -> "Pink"
-    White -> "White"
-    Blue -> "Blue"
-    Yellow -> "Yellow"
-    Aubergine -> "Aubergine"
-    DarkBlue -> "DarkBlue"
-    Charcoal -> "Charcoal"
-    Black -> "Black"
-  }
-}
-
 fn field_to_json(glakes: List(Glake)) -> String {
   list.map(glakes, fn(g) {
     #(
-      color_to_string(g.color),
+      common.color_to_string(g.color),
       json.array(g.position, of: json.array(_, of: json.int)),
     )
   })
@@ -262,8 +243,6 @@ fn field_to_json(glakes: List(Glake)) -> String {
 
 fn ticker(broadcaster: GameLoopSubject) {
   process.sleep(1000)
-  process.send(broadcaster, Tick)
-  // TODO: 
-  process.send(broadcaster, Broadcast("right"))
+  process.send(broadcaster, Broadcast)
   ticker(broadcaster)
 }
