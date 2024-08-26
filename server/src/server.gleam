@@ -1,12 +1,15 @@
 import common.{
-  type Color, type WsPlayerAction as Direction, Down, Left, Nop, Right, Up,
-  field_size, json_to_player_action,
+  type Color, type Field, type WsPlayerAction as Direction, Down, Fruit, Left,
+  Nop, Right, Up, field_size, field_to_json, json_to_player_action,
 }
+import gleam/dict
 import gleam/erlang/process.{type Subject}
 import gleam/function
 import gleam/http
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
+import gleam/int
+import gleam/io
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -238,7 +241,11 @@ fn game_message_handler(message: GameMessage, state: GameState) {
       let next_state = state |> calculate_board
       next_state.glakes
       |> list.each(fn(glake) {
-        process.send(glake.subject, Send(field_to_json(next_state.glakes)))
+        next_state
+        |> make_field
+        |> field_to_json
+        |> Send
+        |> process.send(glake.subject, _)
       })
       next_state |> actor.continue
     }
@@ -262,11 +269,40 @@ fn on_close(state: SocketState, broadcaster: GameLoopSubject) {
   process.send(broadcaster, Unregister(state.subject))
 }
 
+fn make_field(state: GameState) -> Field {
+  state.glakes
+  |> list.map(fn(glake: Glake) -> #(Color, List(#(Int, Int))) {
+    #(glake.color, glake.position)
+  })
+  |> dict.from_list
+  |> dict.insert(Fruit, state.fruites)
+}
+
 fn calculate_board(state: GameState) -> GameState {
   GameState(
     glakes: state.glakes |> list.map(caluclate_glake_movement),
-    fruites: state.fruites,
+    fruites: calculate_fruits(state),
   )
+}
+
+const target_fruits = 5
+
+fn calculate_fruits(state: GameState) -> List(#(Int, Int)) {
+  let missing_fruits = target_fruits - { state.fruites |> list.length }
+  list.range(0, int.max(0, missing_fruits))
+  |> list.drop(1)
+  // ugly, but otherwise range(0, 0) will return an empty list
+  |> list.map(fn(_) -> #(Int, Int) {
+    #(int.random(field_size.0), int.random(field_size.1))
+  })
+  |> list.append(state.fruites)
+  |> list.unique
+  |> list.filter(fn(position: #(Int, Int)) {
+    state.glakes
+    |> list.all(fn(glake: Glake) {
+      !{ glake.position |> list.contains(position) }
+    })
+  })
 }
 
 fn caluclate_glake_movement(glake: Glake) -> Glake {
@@ -283,21 +319,6 @@ fn caluclate_glake_movement(glake: Glake) -> Glake {
     ..glake,
     position: glake.position |> list.append([new_head]) |> list.drop(1),
   )
-}
-
-// Game -------------------------------------------------------
-
-fn field_to_json(glakes: List(Glake)) -> String {
-  list.map(glakes, fn(g) {
-    #(
-      common.color_to_string(g.color),
-      json.array(g.position, fn(position: #(Int, Int)) {
-        json.array([position.0, position.1], json.int)
-      }),
-    )
-  })
-  |> json.object()
-  |> json.to_string
 }
 
 fn ticker(broadcaster: GameLoopSubject) {
