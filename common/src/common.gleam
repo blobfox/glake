@@ -1,6 +1,6 @@
-import gleam/json
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type DecodeError, DecodeError}
+import gleam/json
 import gleam/list
 import gleam/result
 

@@ -12,11 +12,8 @@ import view.{view}
 
 fn init(_flags) -> #(Model, Effect(Msg)) {
   #(
-    Model(dict.from_list([]), None), 
-    effect.batch([
-      ws.init("ws://localhost:8000/ws", WsWrapper),
-      effect.from(global_events),
-    ])
+    Model(dict.from_list([]), None),
+    effect.batch([ws.init("/ws", WsWrapper), effect.from(global_events)]),
   )
 }
 

@@ -127,7 +127,7 @@ fn home_controller(_request: wisp.Request) -> wisp.Response {
         "",
       ),
     ]),
-    html.body([attribute.id("app")], []),
+    html.body([], [html.div([attribute.id("app")], [])]),
   ])
   |> element.to_document_string_builder
   |> wisp.html_response(200)
