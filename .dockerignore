@@ -1,0 +1,16 @@
+# flyctl launch added from client/.gitignore
+client/**/build
+client/**/priv
+
+# flyctl launch added from common/.gitignore
+common/**/*.beam
+common/**/*.ez
+common/build
+common/**/erl_crash.dump
+
+# flyctl launch added from server/.gitignore
+server/**/*.beam
+server/**/*.ez
+server/build
+server/**/erl_crash.dump
+fly.toml

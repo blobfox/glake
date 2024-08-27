@@ -15,7 +15,9 @@ import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
 import gleam/result
 import gleam/set
-import gleam/string_builder
+import lustre/attribute
+import lustre/element
+import lustre/element/html.{html}
 import mist.{type ResponseData, type WebsocketConnection, type WebsocketMessage}
 import mist/internal/http as mist_http
 import wisp
@@ -66,6 +68,11 @@ fn router(request: wisp.Request) -> wisp.Response {
   }
 }
 
+pub fn static_directory() -> String {
+  let assert Ok(priv_directory) = wisp.priv_directory("server")
+  priv_directory <> "/static"
+}
+
 fn middleware(
   request: wisp.Request,
   handle_request: fn(wisp.Request) -> wisp.Response,
@@ -74,6 +81,8 @@ fn middleware(
   use <- wisp.log_request(request)
   use <- wisp.rescue_crashes
   use request <- wisp.handle_head(request)
+  use <- wisp.serve_static(request, under: "/static", from: static_directory())
+
   handle_request(request)
 }
 
@@ -107,8 +116,20 @@ fn websocket_view(
 // Controller ----------------------------------------
 
 fn home_controller(_request: wisp.Request) -> wisp.Response {
-  "<h1>Hello o/</h1>"
-  |> string_builder.from_string
+  html([], [
+    html.head([], [
+      html.link([
+        attribute.rel("stylesheet"),
+        attribute.href("/static/styles.css"),
+      ]),
+      html.script(
+        [attribute.type_("module"), attribute.src("/static/client.mjs")],
+        "",
+      ),
+    ]),
+    html.body([attribute.id("app")], []),
+  ])
+  |> element.to_document_string_builder
   |> wisp.html_response(200)
 }
 
